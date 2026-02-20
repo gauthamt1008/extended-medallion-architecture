@@ -1,0 +1,93 @@
+# ========================================
+# Data Engineering Project - GitIgnore
+# Medallion Architecture (Raw → Bronze → Silver → Gold)
+# ========================================
+
+# ========================================
+# Python
+# ========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Jupyter Notebook checkpoints (keep notebooks, ignore outputs)
+.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# PySpark / Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ========================================
+# Data Files - Medallion Architecture
+# ========================================
+
+# Raw layer - Source data (Parquet, CSV, JSON)
+storage_raw/**/*.parquet
+storage_raw/**/*.json
+
+# Bronze layer - Ingested data with schema
+storage_bronze/**/*.parquet
+storage_bronze/**/_delta_log/
+storage_bronze/**/_staged_commits/
+storage_bronze/**/.crc
+storage_bronze/**/.part-*
+
+# Silver layer - Cleaned and transformed data
+storage_silver/**/*.parquet
+storage_silver/**/_delta_log/
+storage_silver/**/_staged_commits/
+storage_silver/**/.crc
+storage_silver/**/.part-*
+storage_silver/**/_SUCCESS
+storage_silver/**/._SUCCESS.crc
+
+# Gold layer - Aggregated business-level data
+storage_gold/**/*.parquet
+storage_gold/**/_delta_log/
+storage_gold/**/_staged_commits/
+storage_gold/**/.crc
+storage_gold/**/.part-*
+storage_gold/**/_SUCCESS
+storage_gold/**/._SUCCESS.crc
+
+# ========================================
+# IDE & Operating System
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ========================================
+# Logs
+# ========================================
+*.log
+logs/
