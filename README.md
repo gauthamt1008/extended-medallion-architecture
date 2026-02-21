@@ -8,15 +8,15 @@ This project ingests and processes NYC taxi trip data through layered transforma
 ```mermaid
 flowchart TD
 
-    A[NYC Taxi Web API] --> B[Raw Staging Area<br/>Immutable Storage]
+    A[<b>NYC Taxi Web API</b>] --> B[<b>Raw Staging Area</b><br/> - Immutable Storage]
     
-    B --> C[Bronze Layer<br/>Schema Enforcement<br/>Delta Lake]
+    B --> C[<b>Bronze Layer</b><br/> - Schema Enforcement<br/> - Delta Lake]
     
-    C --> D[Silver Layer<br/>Cleaning & Transformations<br/>Feature Engineering]
+    C --> D[<b>Silver Layer</b><br/> - Cleaning & Transformations<br/> - Feature Engineering]
     
-    D --> E[Gold Layer<br/>Analytical Modeling<br/>BI Tables]
+    D --> E[<b>Gold Layer</b><br/> - Analytical Modeling<br/> - BI Tables]
     
-    D --> F[Platinum Layer<br/>AI/ML Ready Data<br/>Feature Store]
+    D --> F[<b>Platinum Layer<b><br/> - AI/ML Ready Data<br/> - Feature Store]
 ```
 ---
 
