@@ -60,22 +60,17 @@ flowchart TD
 ```
 extended-medallion-architecture/
 |-- etl_notebooks/
-|   |-- ingestion_to_raw.ipynb
-|   |-- raw_to_bronze.ipynb
-|   |-- bronze_to_silver.ipynb
-|   |-- silver_to_gold.ipynb
-|   |-- silver_to_platinum.ipynb
-|
-|-- storage_raw/
+|   |-- 00_ingestion_to_raw.ipynb
+|   |-- 01_raw_to_bronze.ipynb
+|   |-- 02_bronze_to_silver.ipynb
+|   |-- 03_silver_to_gold.ipynb
+|   |-- 04_silver_to_platinum.ipynb
+|-- 00_storage_raw/
 |   |--trip_data/
-|   |--trip_type/
-|   |   |--trip_type.csv
-|   |--trip_zone/
-|   |   |--taxi_zone_lookup.csv
-|-- storage_bronze/
-|-- storage_silver/
-|-- storage_gold/
-|-- storage_platinum/
+|-- 01_storage_bronze/
+|-- 02_storage_silver/
+|-- 03_storage_gold/
+|-- 04_storage_platinum/
 ```
 ---
 

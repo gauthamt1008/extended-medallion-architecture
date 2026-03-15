@@ -47,33 +47,42 @@ htmlcov/
 # ========================================
 
 # Raw layer - Source data (Parquet, CSV, JSON)
-storage_raw/**/*.parquet
-storage_raw/**/*.json
+00_storage_raw/**/*.parquet
+00_storage_raw/**/*.json
 
 # Bronze layer - Ingested data with schema
-storage_bronze/**/*.parquet
-storage_bronze/**/_delta_log/
-storage_bronze/**/_staged_commits/
-storage_bronze/**/.crc
-storage_bronze/**/.part-*
+01_storage_bronze/**/*.parquet
+01_storage_bronze/**/_delta_log/
+01_storage_bronze/**/_staged_commits/
+01_storage_bronze/**/.crc
+01_storage_bronze/**/.part-*
 
 # Silver layer - Cleaned and transformed data
-storage_silver/**/*.parquet
-storage_silver/**/_delta_log/
-storage_silver/**/_staged_commits/
-storage_silver/**/.crc
-storage_silver/**/.part-*
-storage_silver/**/_SUCCESS
-storage_silver/**/._SUCCESS.crc
+02_storage_silver/**/*.parquet
+02_storage_silver/**/_delta_log/
+02_storage_silver/**/_staged_commits/
+02_storage_silver/**/.crc
+02_storage_silver/**/.part-*
+02_storage_silver/**/_SUCCESS
+02_storage_silver/**/._SUCCESS.crc
 
 # Gold layer - Aggregated business-level data
-storage_gold/**/*.parquet
-storage_gold/**/_delta_log/
-storage_gold/**/_staged_commits/
-storage_gold/**/.crc
-storage_gold/**/.part-*
-storage_gold/**/_SUCCESS
-storage_gold/**/._SUCCESS.crc
+03_storage_gold/**/*.parquet
+03_storage_gold/**/_delta_log/
+03_storage_gold/**/_staged_commits/
+03_storage_gold/**/.crc
+03_storage_gold/**/.part-*
+03_storage_gold/**/_SUCCESS
+03_storage_gold/**/._SUCCESS.crc
+
+# Platinum layer - Granular data for AI/ML
+04_storage_platinum/**/*.parquet
+04_storage_platinum/**/_delta_log/
+04_storage_platinum/**/_staged_commits/
+04_storage_platinum/**/.crc
+04_storage_platinum/**/.part-*
+04_storage_platinum/**/_SUCCESS
+04_storage_platinum/**/._SUCCESS.crc
 
 # ========================================
 # IDE & Operating System
