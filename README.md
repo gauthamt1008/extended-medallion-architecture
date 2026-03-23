@@ -59,27 +59,32 @@ flowchart TD
 ## Project Structure
 ```
 extended-medallion-architecture/
+|-- 00_storage_raw/
+|-- 01_storage_bronze/
+|-- 02_storage_silver/
+|-- 03_storage_gold/
+|-- 04_storage_platinum/
 |-- etl_notebooks/
 |   |-- 00_ingestion_to_raw.ipynb
 |   |-- 01_raw_to_bronze.ipynb
 |   |-- 02_bronze_to_silver.ipynb
 |   |-- 03_silver_to_gold.ipynb
 |   |-- 04_silver_to_platinum.ipynb
-|-- 00_storage_raw/
-|   |--trip_data/
-|-- 01_storage_bronze/
-|-- 02_storage_silver/
-|-- 03_storage_gold/
-|-- 04_storage_platinum/
+|-- products/
+|   |-- dashboard-app.py
+
 ```
 ---
 
 ## Tech Stack
 
-- Apache Spark 3.5+
-- Delta Lake
-- Python 3.10+
-- Jupyter / Databricks
+- numpy
+- pandas
+- streamlit
+- plotly
+- matplotlib
+- pyspark
+- delta-spark
 
 ---
 
