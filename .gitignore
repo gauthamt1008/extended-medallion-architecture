@@ -5,9 +5,8 @@ __pycache__/
 env/
 .ipynb_checkpoints/
 
-# Alternatively, if you want to keep the FOLDERS but ignore ALL data inside them:
-# [Remove the line above and use these instead:]
-0*/
+# Keep the 00_/01_/02_/03_ directories tracked only via .gitkeep; ignore all other content in them
+0*/**
 !0*/.gitkeep
 
 # === Delta Lake & Spark Metadata (Global) ===
