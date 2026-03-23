@@ -1,102 +1,33 @@
-# ========================================
-# Data Engineering Project - GitIgnore
-# Medallion Architecture (Raw → Bronze → Silver → Gold)
-# ========================================
-
-# ========================================
-# Python
-# ========================================
+# === Python & Environments ===
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-venv/
+.venv/
 env/
-ENV/
-.venv
+.ipynb_checkpoints/
 
-# Jupyter Notebook checkpoints (keep notebooks, ignore outputs)
-.ipynb_checkpoints
-*.ipynb_checkpoints
+# Alternatively, if you want to keep the FOLDERS but ignore ALL data inside them:
+# [Remove the line above and use these instead:]
+0*/
+!0*/.gitkeep
 
-# PySpark / Pytest
-.pytest_cache/
-.coverage
-htmlcov/
+# === Delta Lake & Spark Metadata (Global) ===
+# This catches logs/metadata at any depth in your project
+**/_delta_log/
+**/_checkpoints/
+**/_staged_commits/
+**/_SUCCESS
+**/.crc
+**/*.part-*
 
-# ========================================
-# Data Files - Medallion Architecture
-# ========================================
+# === Specific Data Formats ===
+*.parquet
+*.csv
+*.json
+# Keep your actual source code JSONs if necessary:
+# !config.json
 
-# Raw layer - Source data (Parquet, CSV, JSON)
-00_storage_raw/**/*.parquet
-00_storage_raw/**/*.json
-
-# Bronze layer - Ingested data with schema
-01_storage_bronze/**/*.parquet
-01_storage_bronze/**/_delta_log/
-01_storage_bronze/**/_staged_commits/
-01_storage_bronze/**/.crc
-01_storage_bronze/**/.part-*
-
-# Silver layer - Cleaned and transformed data
-02_storage_silver/**/*.parquet
-02_storage_silver/**/_delta_log/
-02_storage_silver/**/_staged_commits/
-02_storage_silver/**/.crc
-02_storage_silver/**/.part-*
-02_storage_silver/**/_SUCCESS
-02_storage_silver/**/._SUCCESS.crc
-
-# Gold layer - Aggregated business-level data
-03_storage_gold/**/*.parquet
-03_storage_gold/**/_delta_log/
-03_storage_gold/**/_staged_commits/
-03_storage_gold/**/.crc
-03_storage_gold/**/.part-*
-03_storage_gold/**/_SUCCESS
-03_storage_gold/**/._SUCCESS.crc
-
-# Platinum layer - Granular data for AI/ML
-04_storage_platinum/**/*.parquet
-04_storage_platinum/**/_delta_log/
-04_storage_platinum/**/_staged_commits/
-04_storage_platinum/**/.crc
-04_storage_platinum/**/.part-*
-04_storage_platinum/**/_SUCCESS
-04_storage_platinum/**/._SUCCESS.crc
-
-# ========================================
-# IDE & Operating System
-# ========================================
+# === IDE & OS ===
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
 .DS_Store
-Thumbs.db
-
-# ========================================
-# Logs
-# ========================================
 *.log
-logs/
