@@ -53,39 +53,39 @@ spark = get_spark()
 def load_data():
 
     fact_year = spark.read.format("delta").load(
-        r"..\03_storage_gold\facts\fact_trip_yearly_summary"
+        r"..\..\03_storage_gold\facts\fact_trip_yearly_summary"
     ).toPandas()
 
     fact_payment = spark.read.format("delta").load(
-        r"..\03_storage_gold\facts\fact_payment_summary"
+        r"..\..\03_storage_gold\facts\fact_payment_summary"
     ).toPandas()
 
     fact_distance = spark.read.format("delta").load(
-        r"..\03_storage_gold\facts\fact_distance_summary"
+        r"..\..\03_storage_gold\facts\fact_distance_summary"
     ).toPandas()
 
     fact_vendor = spark.read.format("delta").load(
-        r"..\03_storage_gold\facts\fact_vendor_summary"
+        r"..\..\03_storage_gold\facts\fact_vendor_summary"
     ).toPandas()
 
     fact_time = spark.read.format("delta").load(
-        r"..\03_storage_gold\facts\fact_trip_time_summary"
+        r"..\..\03_storage_gold\facts\fact_trip_time_summary"
     ).toPandas()
 
     fact_location = spark.read.format("delta").load(
-        r"..\03_storage_gold\facts\fact_location_summary"
+        r"..\..\03_storage_gold\facts\fact_location_summary"
     ).toPandas()
 
     dim_payment = spark.read.format("delta").load(
-        r"..\03_storage_gold\dimensions\dim_payment_type"
+        r"..\..\03_storage_gold\dimensions\dim_payment_type"
     ).toPandas()
 
     dim_vendor = spark.read.format("delta").load(
-        r"..\03_storage_gold\dimensions\dim_vendor"
+        r"..\..\03_storage_gold\dimensions\dim_vendor"
     ).toPandas()
 
     dim_zone = spark.read.format("delta").load(
-        r"..\03_storage_gold\dimensions\dim_location"
+        r"..\..\03_storage_gold\dimensions\dim_location"
     ).toPandas()
 
     return (

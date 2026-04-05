@@ -18,6 +18,10 @@ env/
 **/.crc
 **/*.part-*
 
+# === ml model ===
+*.pkl
+
+
 # === Specific Data Formats ===
 *.parquet
 *.csv
