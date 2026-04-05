@@ -5,3 +5,7 @@ plotly
 matplotlib
 pyspark
 delta-spark
+lightgbm
+scikit-learn
+requests
+joblib
