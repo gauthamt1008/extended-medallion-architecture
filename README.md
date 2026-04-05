@@ -79,6 +79,53 @@ A Streamlit-based operational dashboard built for fleet management and future ca
 
 ---
 
+## How to Run Locally
+
+### 1. Prerequisites
+Ensure you have **Java 8 or 11** installed (required for PySpark) and **Python 3.9+**.
+
+### 2. Setup Environment
+Clone the repository and install the required dependencies:
+```bash
+git clone <your-repo-url>
+cd extended-medallion-architecture
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+# Mac/Linux
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### 3. Execute the ETL Pipeline
+The pipeline must be executed sequentially to build the layers from Raw to Platinum. Run the notebooks in the following order:
+1. `etl_notebooks/00_ingestion_to_raw.ipynb`
+2. `etl_notebooks/01_raw_to_bronze.ipynb`
+3. `etl_notebooks/02_bronze_to_silver.ipynb`
+4. `etl_notebooks/03_silver_to_gold.ipynb`
+5. `etl_notebooks/04_silver_to_platinum.ipynb`
+6. `products/forecasting_demand/demand_forecast_model_training.ipynb`
+
+### 4. Launch the Dashboards
+*Note: Due to relative pathing in the scripts, you must navigate into the specific product folders before launching Streamlit.*
+
+**To run the Historical BI Dashboard (Gold):**
+```bash
+cd products/historical_demand
+streamlit run historical_dashboard.py
+```
+
+**To run the Predictive Dashboard (Platinum):**
+Open a new terminal, activate your virtual environment, and run:
+```bash
+cd products/forecasting_demand
+streamlit run forecast_dashboard.py
+```
+
+---
+
 ## Project Structure
 ```text
 extended-medallion-architecture/
@@ -117,4 +164,4 @@ extended-medallion-architecture/
 - **Scale:** PySpark memory optimization and shuffle tuning (`spark.sql.adaptive.enabled`) for large-scale batch processing.
 - **Reliability:** Deterministic, idempotent transformations with Bronze-layer quarantine routing for data quality assurance.
 
----
+### <p align="right">– By Gautham T.</p>
