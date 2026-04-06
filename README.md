@@ -87,7 +87,7 @@ Ensure you have **Java 8 or 11** installed (required for PySpark) and **Python 3
 ### 2. Setup Environment
 Clone the repository and install the required dependencies:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/gauthamt1008/extended-medallion-architecture.git
 cd extended-medallion-architecture
 python -m venv venv
 
