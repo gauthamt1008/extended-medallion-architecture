@@ -19,19 +19,19 @@ spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
 preds = (
     spark.read.format("delta")
-    .load(r".\dashboard_data\demand_predictions")
+    .load(r"..\model_evaluation_data\demand_predictions")
     .toPandas()
 )
 
 metrics = (
     spark.read.format("delta")
-    .load(r".\dashboard_data\forecast_metrics")
+    .load(r"..\model_evaluation_data\forecast_metrics")
     .toPandas()
 )
 
 importance = (
     spark.read.format("delta")
-    .load(r".\dashboard_data\forecast_feature_importance")
+    .load(r"..\model_evaluation_data\forecast_feature_importance")
     .toPandas()
 )
 

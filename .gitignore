@@ -18,6 +18,10 @@ env/
 **/.crc
 **/*.part-*
 
+# === code extractor
+all_code.txt
+x.py
+
 # === ml model ===
 *.pkl
 
