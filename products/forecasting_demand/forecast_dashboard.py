@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from pyspark.sql import SparkSession
 from delta import configure_spark_with_delta_pip
+import os
 
 
 # --------------------------------------------------
@@ -54,8 +55,9 @@ st.markdown("""
 # --------------------------------------------------
 # LOAD MODEL
 # --------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-MODEL_PATH = r".\model\demand_forecast_lgbm.pkl"
+MODEL_PATH = os.path.join(BASE_DIR, "model", "demand_forecast_lgbm.pkl")
 pkg        = pickle.load(open(MODEL_PATH, "rb"))
 model      = pkg["model"]
 feature_cols = pkg["features"]
@@ -87,7 +89,7 @@ def load_data():
 
     demand = (
         spark.read.format("delta")
-        .load(r"..\..\04_storage_platinum\demand_series")
+        .load(os.path.join(BASE_DIR, "..", "..", "04_storage_platinum", "demand_series"))
         .toPandas()
     )
     demand["datetime"] = (
@@ -98,7 +100,7 @@ def load_data():
 
     dim_location = (
         spark.read.format("delta")
-        .load(r"..\..\03_storage_gold\dimensions\dim_location")
+        .load(os.path.join(BASE_DIR, "..", "..", "03_storage_gold", "dimensions", "dim_location"))
         .toPandas()
     )
 

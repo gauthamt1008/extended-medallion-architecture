@@ -117,26 +117,34 @@ def get_spark():
     return configure_spark_with_delta_pip(builder).getOrCreate()
 
 
+import os
+
 @st.cache_data
 def load_gold():
     spark = get_spark()
-    gold  = r"..\..\03_storage_gold"
+    
+    # 1. Get the absolute path of the directory this specific script is sitting in
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    
+    # 2. Navigate up two levels ("..", "..") and into the gold folder
+    # This creates a rock-solid absolute path no matter where the orchestrator is run
+    gold = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "03_storage_gold"))
 
     def read(path):
         return spark.read.format("delta").load(path).toPandas()
 
+    # 3. Use os.path.join instead of hardcoded slashes for bulletproof cross-platform paths
     return {
-        "fact_year":     read(rf"{gold}\facts\fact_trip_yearly_summary"),
-        "fact_payment":  read(rf"{gold}\facts\fact_payment_summary"),
-        "fact_distance": read(rf"{gold}\facts\fact_distance_summary"),
-        "fact_vendor":   read(rf"{gold}\facts\fact_vendor_summary"),
-        "fact_time":     read(rf"{gold}\facts\fact_trip_time_summary"),
-        "fact_location": read(rf"{gold}\facts\fact_location_summary"),
-        "dim_location":  read(rf"{gold}\dimensions\dim_location"),
-        "dim_payment":   read(rf"{gold}\dimensions\dim_payment_type"),
-        "dim_vendor":    read(rf"{gold}\dimensions\dim_vendor"),
+        "fact_year":     read(os.path.join(gold, "facts", "fact_trip_yearly_summary")),
+        "fact_payment":  read(os.path.join(gold, "facts", "fact_payment_summary")),
+        "fact_distance": read(os.path.join(gold, "facts", "fact_distance_summary")),
+        "fact_vendor":   read(os.path.join(gold, "facts", "fact_vendor_summary")),
+        "fact_time":     read(os.path.join(gold, "facts", "fact_trip_time_summary")),
+        "fact_location": read(os.path.join(gold, "facts", "fact_location_summary")),
+        "dim_location":  read(os.path.join(gold, "dimensions", "dim_location")),
+        "dim_payment":   read(os.path.join(gold, "dimensions", "dim_payment_type")),
+        "dim_vendor":    read(os.path.join(gold, "dimensions", "dim_vendor")),
     }
-
 
 gold = load_gold()
 
