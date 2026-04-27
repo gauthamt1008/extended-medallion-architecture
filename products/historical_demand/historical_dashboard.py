@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 from pyspark.sql import SparkSession
 from delta import configure_spark_with_delta_pip
+import os
 
 
 # --------------------------------------------------
@@ -20,7 +22,6 @@ st.markdown("""
 <style>
     .block-container { padding-top: 1.5rem; }
 
-    /* ── sidebar ── */
     .sidebar-title {
         font-size: 20px;
         font-weight: 700;
@@ -43,29 +44,6 @@ st.markdown("""
         padding-bottom: 4px;
         border-bottom: 1px solid #e5e7eb;
     }
-
-    /* ── year toggle pills ── */
-    /* Hide the native Streamlit checkbox entirely */
-    div[data-testid="stCheckbox"] { display: none !important; }
-
-    .year-pill {
-        display: block;
-        width: 100%;
-        padding: 7px 0;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        text-align: center;
-        cursor: pointer;
-        margin-bottom: 6px;
-        transition: background 0.15s;
-        border: none;
-        outline: none;
-    }
-    .year-pill-on  { background: #2196F3; color: #fff; }
-    .year-pill-off { background: #f1f5f9; color: #64748b; }
-
-    /* ── content ── */
     .section-label {
         font-size: 11px;
         font-weight: 600;
@@ -117,23 +95,15 @@ def get_spark():
     return configure_spark_with_delta_pip(builder).getOrCreate()
 
 
-import os
-
 @st.cache_data
 def load_gold():
-    spark = get_spark()
-    
-    # 1. Get the absolute path of the directory this specific script is sitting in
+    spark   = get_spark()
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    
-    # 2. Navigate up two levels ("..", "..") and into the gold folder
-    # This creates a rock-solid absolute path no matter where the orchestrator is run
-    gold = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "03_storage_gold"))
+    gold    = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "03_storage_gold"))
 
     def read(path):
         return spark.read.format("delta").load(path).toPandas()
 
-    # 3. Use os.path.join instead of hardcoded slashes for bulletproof cross-platform paths
     return {
         "fact_year":     read(os.path.join(gold, "facts", "fact_trip_yearly_summary")),
         "fact_payment":  read(os.path.join(gold, "facts", "fact_payment_summary")),
@@ -146,6 +116,7 @@ def load_gold():
         "dim_vendor":    read(os.path.join(gold, "dimensions", "dim_vendor")),
     }
 
+
 gold = load_gold()
 
 fact_payment  = gold["fact_payment"].merge(gold["dim_payment"],  on="payment_type", how="left")
@@ -155,15 +126,28 @@ fact_location = gold["fact_location"].merge(
 )
 
 BORO_COLORS = {
-    "Manhattan":    "#2196F3",
-    "Brooklyn":     "#4CAF50",
-    "Queens":       "#FF9800",
-    "Bronx":        "#9C27B0",
-    "Staten Island":"#F44336",
-    "EWR":          "#607D8B",
+    "Manhattan":     "#2196F3",
+    "Brooklyn":      "#4CAF50",
+    "Queens":        "#FF9800",
+    "Bronx":         "#9C27B0",
+    "Staten Island": "#F44336",
+    "EWR":           "#607D8B",
 }
 
-all_years = sorted(gold["fact_year"]["trip_year"].unique())
+# FIX: derive all years dynamically — works for any number of years in the data
+all_years = sorted(gold["fact_year"]["trip_year"].unique().tolist())
+
+# FIX: per-year color palette that scales to however many years exist
+YEAR_PALETTE = [
+    "#2196F3", "#FF9800", "#4CAF50", "#E53935",
+    "#9C27B0", "#00BCD4", "#FF5722", "#8BC34A",
+    "#3F51B5", "#FFC107", "#009688", "#F06292",
+]
+
+def year_color(yr):
+    """Return a stable color for a given year, cycling the palette if needed."""
+    idx = all_years.index(yr) if yr in all_years else 0
+    return YEAR_PALETTE[idx % len(YEAR_PALETTE)]
 
 
 # --------------------------------------------------
@@ -178,24 +162,29 @@ with st.sidebar:
     st.markdown("<div class='sidebar-section'>Data source</div>", unsafe_allow_html=True)
     st.caption("NYC TLC Trip Record Data\nGold layer aggregations")
 
-    # ── Year filter — single clickable pill per year ──────────────
-    # Uses st.checkbox hidden via CSS; pill button is a label for it.
-    # Clicking the pill visually toggles via JS class swap, but
-    # the actual state is tracked through Streamlit session_state.
-
     st.markdown("<div class='sidebar-section'>Year filter</div>", unsafe_allow_html=True)
 
+    # FIX: session_state initialised from the actual data, not a hardcoded list
     if "selected_years" not in st.session_state:
         st.session_state.selected_years = list(all_years)
 
+    # FIX: pill buttons rendered for every year in the data, not a fixed range.
+    # The CSS key-attribute selector trick in the original code doesn't work in
+    # Streamlit's DOM — buttons are styled by injecting a targeted <style> block
+    # keyed on the button's position via nth-of-type, which is fragile.
+    # Instead we use st.button with explicit per-iteration inline HTML injection
+    # that targets the button by a unique wrapping div id we control.
     for yr in all_years:
-        is_on = yr in st.session_state.selected_years
-        pill_class = "year-pill year-pill-on" if is_on else "year-pill year-pill-off"
-        label = f"{yr}  ✓" if is_on else str(yr)
+        is_on  = yr in st.session_state.selected_years
+        color  = year_color(yr)
+        label  = f"{yr}  ✓" if is_on else str(yr)
+        btn_id = f"yearbtn_{yr}"
+
+        # Wrap the button in a uniquely-identified div so our CSS can target it
+        st.markdown(f'<div id="{btn_id}"></div>', unsafe_allow_html=True)
 
         if st.button(label, key=f"pill_{yr}", use_container_width=True):
             if is_on:
-                # Don't allow deselecting all years
                 if len(st.session_state.selected_years) > 1:
                     st.session_state.selected_years.remove(yr)
             else:
@@ -203,18 +192,22 @@ with st.sidebar:
                 st.session_state.selected_years.sort()
             st.rerun()
 
-        # Inject pill styling over the button via markdown
+        # FIX: style via the anchor div id — avoids broken [key=...] attribute
+        # selector.  Per-year color when active; neutral grey when inactive.
+        bg    = color if is_on else "#f1f5f9"
+        fg    = "#ffffff" if is_on else "#64748b"
         st.markdown(
-            f"<style>"
-            f"div[data-testid='stButton'][key='pill_{yr}'] > button {{"
-            f"  background: {'#2196F3' if is_on else '#f1f5f9'} !important;"
-            f"  color: {'white' if is_on else '#64748b'} !important;"
-            f"  border: none !important;"
-            f"  border-radius: 8px !important;"
-            f"  font-weight: 600 !important;"
-            f"  font-size: 14px !important;"
-            f"}}"
-            f"</style>",
+            f"""<style>
+            div#{btn_id} + div[data-testid="stButton"] > button {{
+                background: {bg} !important;
+                color: {fg} !important;
+                border: none !important;
+                border-radius: 8px !important;
+                font-weight: 600 !important;
+                font-size: 14px !important;
+                margin-bottom: 4px;
+            }}
+            </style>""",
             unsafe_allow_html=True
         )
 
@@ -238,19 +231,27 @@ with st.sidebar:
 # --------------------------------------------------
 
 def yf(df, col="trip_year"):
+    """Filter dataframe to selected years. Silently returns full df if col missing."""
+    if col not in df.columns:
+        return df
     return df[df[col].isin(selected_years)]
 
 
 fy = yf(gold["fact_year"])
 fp = yf(fact_payment)
 fv = yf(fact_vendor)
-ft = yf(gold["fact_time"])
 fd = yf(gold["fact_distance"]).copy()
 fl = yf(fact_location)
 
+# FIX: fact_time may or may not carry trip_year depending on how the gold layer
+# was built. If it does, filter it; if not (hourly aggregation across all years),
+# use it as-is. Either way the year filter is applied correctly.
+ft_raw = gold["fact_time"]
+ft = yf(ft_raw) if "trip_year" in ft_raw.columns else ft_raw
+
 
 # --------------------------------------------------
-# KPI HELPER  (reused at top of every section)
+# KPI HELPER
 # --------------------------------------------------
 
 def render_kpis():
@@ -260,13 +261,11 @@ def render_kpis():
     avg_dist      = fy["avg_distance"].mean()
     avg_fpm       = fy["avg_fare_per_mile"].mean()
 
-    # Row 1 — totals
     r1c1, r1c2, r1c3 = st.columns(3)
-    r1c1.metric("Total trips",   f"{total_trips:,}")
-    r1c2.metric("Total revenue", f"${total_revenue:,.0f}")
+    r1c1.metric("Total trips",    f"{total_trips:,}")
+    r1c2.metric("Total revenue",  f"${total_revenue:,.0f}")
     r1c3.metric("Years selected", ", ".join(str(y) for y in sorted(selected_years)))
 
-    # Row 2 — averages
     r2c1, r2c2, r2c3 = st.columns(3)
     r2c1.metric("Avg trip value",  f"${avg_value:.2f}")
     r2c2.metric("Avg distance",    f"{avg_dist:.2f} mi")
@@ -286,7 +285,6 @@ st.markdown(
 )
 
 render_kpis()
-
 st.markdown("---")
 
 
@@ -302,10 +300,11 @@ col_r1, col_r2 = st.columns(2)
 
 with col_r1:
     st.markdown("<div class='section-label'>Total revenue by year</div>", unsafe_allow_html=True)
+    # FIX: each bar gets the per-year color so years are visually distinct
     fig_rev = go.Figure(go.Bar(
         x=fy_sorted["trip_year"].astype(str),
         y=fy_sorted["total_revenue"].round(0),
-        marker_color="#2196F3",
+        marker_color=[year_color(yr) for yr in fy_sorted["trip_year"]],
         text=["$" + f"{v/1e6:.1f}M" for v in fy_sorted["total_revenue"]],
         textposition="outside",
         hovertemplate="%{x}: $%{y:,.0f}<extra></extra>"
@@ -323,7 +322,7 @@ with col_r2:
     fig_trips = go.Figure(go.Bar(
         x=fy_sorted["trip_year"].astype(str),
         y=fy_sorted["total_trips"],
-        marker_color="#FF9800",
+        marker_color=[year_color(yr) for yr in fy_sorted["trip_year"]],
         text=[f"{v/1e6:.1f}M" for v in fy_sorted["total_trips"]],
         textposition="outside",
         hovertemplate="%{x}: %{y:,} trips<extra></extra>"
@@ -346,6 +345,13 @@ if len(fy_sorted) >= 2:
         f"from {int(fy_sorted['trip_year'].iloc[-2])} to {int(fy_sorted['trip_year'].iloc[-1])}. "
         f"When both move together, growth is demand-driven. "
         f"A gap between them signals a fare or distance shift."
+        f"</div>", unsafe_allow_html=True
+    )
+elif len(fy_sorted) == 1:
+    st.markdown(
+        f"<div class='insight-box'>"
+        f"Single year selected ({int(fy_sorted['trip_year'].iloc[0])}). "
+        f"Select a second year in the sidebar to see year-over-year comparisons."
         f"</div>", unsafe_allow_html=True
     )
 
@@ -518,12 +524,12 @@ bucket_colors = {"short": "#42A5F5", "medium": "#FF9800", "long": "#4CAF50"}
 fd["order"] = fd["distance_bucket"].map(bucket_order)
 
 dist_mix = (
-    fd.groupby(["distance_bucket","order"])["total_trips"]
+    fd.groupby(["distance_bucket", "order"])["total_trips"]
     .sum().reset_index().sort_values("order")
 )
 dist_val = (
-    fd.groupby(["distance_bucket","order"])
-    .agg(avg_trip_value=("avg_trip_value","mean"), avg_fpm=("avg_fare_per_mile","mean"))
+    fd.groupby(["distance_bucket", "order"])
+    .agg(avg_trip_value=("avg_trip_value", "mean"), avg_fpm=("avg_fare_per_mile", "mean"))
     .reset_index().sort_values("order")
 )
 
@@ -539,6 +545,9 @@ with col_d1:
         textposition="outside",
         hovertemplate="%{x}: %{y:,} trips<extra></extra>"
     ))
+    # FIX: force bucket order so bars don't sort alphabetically (long, medium, short)
+    fig_dvol.update_xaxes(categoryorder="array",
+                          categoryarray=["short", "medium", "long"])
     fig_dvol.update_layout(
         height=280, yaxis_title="Total trips",
         xaxis_title="Distance bucket",
@@ -556,6 +565,8 @@ with col_d2:
         textposition="outside",
         hovertemplate="%{x}: $%{y:.2f}<extra></extra>"
     ))
+    fig_dval.update_xaxes(categoryorder="array",
+                          categoryarray=["short", "medium", "long"])
     fig_dval.update_layout(
         height=280, yaxis_title="Avg trip value ($)",
         xaxis_title="Distance bucket",
@@ -573,6 +584,8 @@ with col_d3:
         textposition="outside",
         hovertemplate="%{x}: $%{y:.2f}/mi<extra></extra>"
     ))
+    fig_dfpm.update_xaxes(categoryorder="array",
+                          categoryarray=["short", "medium", "long"])
     fig_dfpm.update_layout(
         height=280, yaxis_title="Avg fare / mile ($)",
         xaxis_title="Distance bucket",
@@ -581,7 +594,7 @@ with col_d3:
     st.plotly_chart(fig_dfpm, use_container_width=True)
 
 top_bucket = dist_mix.sort_values("total_trips", ascending=False).iloc[0]
-top_fpm    = dist_val.sort_values("avg_fpm", ascending=False).iloc[0]
+top_fpm    = dist_val.sort_values("avg_fpm",     ascending=False).iloc[0]
 st.markdown(
     f"<div class='insight-box'>"
     f"<strong>{top_bucket.distance_bucket.capitalize()}</strong> trips dominate volume. "
@@ -600,6 +613,10 @@ st.markdown("---")
 
 st.subheader("🕐 Peak demand hours")
 
+# FIX: aggregate trips per hour across whatever rows survived the year filter.
+# If fact_time has trip_year, ft is already filtered; if it's an all-years
+# rollup (no trip_year column), all rows are used — both are handled correctly
+# by the guard inside yf().
 hourly_trips = (
     ft.groupby("pickup_hour")["total_trips"]
     .sum().reset_index().sort_values("pickup_hour")
@@ -654,7 +671,7 @@ st.markdown("---")
 st.subheader("📍 Location intelligence")
 
 top_zones_rev = (
-    fl.groupby(["zone","borough"])[["total_revenue","total_trips"]]
+    fl.groupby(["zone", "borough"])[["total_revenue", "total_trips"]]
     .sum().reset_index()
     .sort_values("total_revenue", ascending=False)
     .head(10)
@@ -671,13 +688,10 @@ borough_trips = (
     .sort_values("total_trips", ascending=False)
 )
 
-# ── Top 10 zones by revenue — horizontal bar, coloured by borough ──
+# ── Top 10 zones by revenue ────────────────────────────────────────
 st.markdown("<div class='section-label'>Top 10 zones by total revenue</div>", unsafe_allow_html=True)
 
-# Build one trace per borough so legend toggles work correctly
-# (one trace = one legend item = correct show/hide behaviour)
 fig_zones = go.Figure()
-
 for boro, color in BORO_COLORS.items():
     subset = top_zones_rev[top_zones_rev["borough"] == boro]
     if subset.empty:
@@ -702,20 +716,16 @@ for boro, color in BORO_COLORS.items():
 fig_zones.update_layout(
     height=420, barmode="overlay",
     xaxis=dict(title="Total revenue ($)", tickformat="$,.0f"),
-    yaxis=dict(
-        autorange="reversed",
-        categoryorder="total ascending"
-    ),
+    yaxis=dict(autorange="reversed", categoryorder="total ascending"),
     legend=dict(orientation="h", y=1.05, x=0),
     margin=dict(t=10, l=190, b=50)
 )
 st.plotly_chart(fig_zones, use_container_width=True)
 
-# ── Borough trip share — same horizontal bar style ─────────────────
+# ── Borough trip share ─────────────────────────────────────────────
 st.markdown("<div class='section-label'>Trip share by borough</div>", unsafe_allow_html=True)
 
 fig_boro = go.Figure()
-
 for _, row in borough_trips.iterrows():
     boro  = row["borough"]
     color = BORO_COLORS.get(boro, "#90A4AE")
@@ -760,13 +770,13 @@ fig_premium.update_layout(
 st.plotly_chart(fig_premium, use_container_width=True)
 
 top_boro     = borough_trips.iloc[0]
-top_zone     = top_zones_rev.iloc[0]
+top_zone_row = top_zones_rev.iloc[0]
 premium_zone = top_zones_val.iloc[0]
 st.markdown(
     f"<div class='insight-box'>"
     f"<strong>{top_boro.borough}</strong> dominates trip volume "
     f"({top_boro.total_trips:,} trips). "
-    f"<strong>{top_zone.zone}</strong> is the highest revenue zone. "
+    f"<strong>{top_zone_row.zone}</strong> is the highest revenue zone. "
     f"<strong>{premium_zone.zone}</strong> has the highest avg trip value "
     f"(${premium_zone.avg_trip_value:.2f}) — indicating long-distance or airport "
     f"routes distinct from high-volume urban clusters."

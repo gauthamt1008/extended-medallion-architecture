@@ -152,22 +152,72 @@ selected_zone_id   = zone_options[selected_zone_name]
 
 
 # --------------------------------------------------
-# HELPER: autoregressive prediction
+# HELPERS
 # --------------------------------------------------
+
+# Canonical month order used across all charts
+MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+DOW_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def dynamic_year_colors(years):
+    """
+    FIX (Bug 2): Build year→color mapping dynamically from the actual years
+    present in the data instead of a hardcoded dict.  New years loaded by
+    incremental pipeline runs automatically receive a distinct color.
+    """
+    palette = [
+        "#90CAF9", "#2196F3", "#0D47A1",
+        "#E53935", "#43A047", "#FF9800",
+        "#9C27B0", "#00BCD4",
+    ]
+    return {yr: palette[i % len(palette)] for i, yr in enumerate(sorted(years))}
+
+
+def safe_lag(series, n, fallback):
+    """
+    FIX (Bug 3): Return lag value only when the position exists AND is not NaN.
+    Falls back to `fallback` otherwise so NaN never propagates into predictions.
+    """
+    if len(series) < n:
+        return fallback
+    val = series.iloc[-n]
+    return float(val) if pd.notna(val) else fallback
+
 
 def predict_demand(zone_id, datetimes, seed_df):
     """
     Autoregressively predict trip_count for a list of future datetimes.
     seed_df: real historical rows used for initial lag lookups.
-    Returns: list of float predictions (same length as datetimes).
+
+    FIX (Bug 3): NaN-safe lag extraction via safe_lag().
+    FIX (Bug 4): avg_fare / avg_distance / avg_passengers are carried forward
+                 from real seed values separately so the rolling window stays
+                 anchored to real observations for as long as possible, rather
+                 than immediately converging to a constant.
     """
-    buf   = seed_df.copy().reset_index(drop=True)
+    buf = seed_df.copy().reset_index(drop=True)
+
+    # Pre-compute real averages from seed so we have a stable fallback
+    seed_avg_fare       = float(buf["avg_fare"].dropna().tail(24).mean())
+    seed_avg_distance   = float(buf["avg_distance"].dropna().tail(24).mean())
+    seed_avg_passengers = float(buf["avg_passengers"].dropna().tail(24).mean())
+
     preds = []
 
     for dt in datetimes:
-        lag_1h   = float(buf["trip_count"].iloc[-1])
-        lag_24h  = float(buf["trip_count"].iloc[-24])  if len(buf) >= 24  else lag_1h
-        lag_168h = float(buf["trip_count"].iloc[-168]) if len(buf) >= 168 else lag_1h
+        lag_1h = safe_lag(buf["trip_count"], 1, 0.0)
+        lag_24h  = safe_lag(buf["trip_count"], 24,  lag_1h)
+        lag_168h = safe_lag(buf["trip_count"], 168, lag_1h)
+
+        # Use real values from the seed window for as long as they exist;
+        # once the buffer is all-predicted rows use the seed averages.
+        real_rows = buf[buf["_is_real"]].tail(24) if "_is_real" in buf.columns else buf.tail(24)
+        avg_fare       = float(real_rows["avg_fare"].dropna().mean())       if not real_rows["avg_fare"].dropna().empty       else seed_avg_fare
+        avg_distance   = float(real_rows["avg_distance"].dropna().mean())   if not real_rows["avg_distance"].dropna().empty   else seed_avg_distance
+        avg_passengers = float(real_rows["avg_passengers"].dropna().mean()) if not real_rows["avg_passengers"].dropna().empty else seed_avg_passengers
 
         # PySpark dayofweek: 1=Sun … 7=Sat
         dow_pandas = dt.dayofweek
@@ -185,9 +235,9 @@ def predict_demand(zone_id, datetimes, seed_df):
             "lag_1h":         lag_1h,
             "lag_24h":        lag_24h,
             "lag_168h":       lag_168h,
-            "avg_fare":       float(buf["avg_fare"].iloc[-24:].mean()),
-            "avg_distance":   float(buf["avg_distance"].iloc[-24:].mean()),
-            "avg_passengers": float(buf["avg_passengers"].iloc[-24:].mean()),
+            "avg_fare":       avg_fare,
+            "avg_distance":   avg_distance,
+            "avg_passengers": avg_passengers,
         }
 
         pred = float(np.clip(
@@ -197,9 +247,10 @@ def predict_demand(zone_id, datetimes, seed_df):
 
         buf = pd.concat([buf, pd.DataFrame([{
             "trip_count":     pred,
-            "avg_fare":       row["avg_fare"],
-            "avg_distance":   row["avg_distance"],
-            "avg_passengers": row["avg_passengers"],
+            "avg_fare":       avg_fare,
+            "avg_distance":   avg_distance,
+            "avg_passengers": avg_passengers,
+            "_is_real":       False,
         }])], ignore_index=True)
 
     return preds
@@ -242,7 +293,7 @@ if tab_choice == "Seasonal Patterns":
 
     fig_hour = go.Figure()
     for day_type, color in [("Weekday", "#2196F3"), ("Weekend", "#FF9800")]:
-        grp = hourly[hourly["day_type"] == day_type]
+        grp = hourly[hourly["day_type"] == day_type].sort_values("pickup_hour")
         fig_hour.add_trace(go.Scatter(
             x=grp["pickup_hour"], y=grp["trip_count"].round(1),
             mode="lines+markers", name=day_type,
@@ -284,7 +335,6 @@ if tab_choice == "Seasonal Patterns":
 
     zone_df["dow_num"]  = pd.to_datetime(zone_df["trip_date"]).dt.dayofweek  # 0=Mon
     zone_df["dow_name"] = pd.to_datetime(zone_df["trip_date"]).dt.strftime("%a")
-    dow_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
     typical_week = (
         zone_df
@@ -292,14 +342,15 @@ if tab_choice == "Seasonal Patterns":
         .mean().reset_index()
         .sort_values(["dow_num", "pickup_hour"])
     )
-    typical_week["label"] = typical_week["dow_name"] + " " + typical_week["pickup_hour"].apply(lambda h: f"{h:02d}:00")
+
+    colors_week = {
+        "Mon": "#1565C0", "Tue": "#1976D2", "Wed": "#1E88E5",
+        "Thu": "#42A5F5", "Fri": "#2196F3", "Sat": "#FF9800", "Sun": "#F44336"
+    }
 
     fig_week = go.Figure()
-    colors_week = {"Mon": "#1565C0", "Tue": "#1976D2", "Wed": "#1E88E5",
-                "Thu": "#42A5F5", "Fri": "#2196F3", "Sat": "#FF9800", "Sun": "#F44336"}
-
-    for dow in dow_order:
-        grp = typical_week[typical_week["dow_name"] == dow]
+    for dow in DOW_ORDER:
+        grp = typical_week[typical_week["dow_name"] == dow].sort_values("pickup_hour")
         fig_week.add_trace(go.Scatter(
             x=grp["pickup_hour"], y=grp["trip_count"].round(1),
             mode="lines", name=dow,
@@ -316,7 +367,7 @@ if tab_choice == "Seasonal Patterns":
     )
     st.plotly_chart(fig_week, use_container_width=True)
 
-    busiest = typical_week.nlargest(1, "trip_count").iloc[0]
+    busiest  = typical_week.nlargest(1,  "trip_count").iloc[0]
     quietest = typical_week.nsmallest(1, "trip_count").iloc[0]
     st.markdown(
         f"<div class='insight-box'>"
@@ -335,6 +386,7 @@ if tab_choice == "Seasonal Patterns":
 
     monthly = (
         zone_df.groupby("month")["trip_count"].mean().reset_index()
+        .sort_values("month")   # ensure numeric month order is preserved
     )
     monthly["month_name"] = pd.to_datetime(monthly["month"], format="%m").dt.strftime("%b")
     avg_demand = monthly["trip_count"].mean()
@@ -357,13 +409,19 @@ if tab_choice == "Seasonal Patterns":
         annotation_text=f"Annual avg: {avg_demand:.0f}",
         annotation_position="top right"
     )
+    # FIX (Bug 1): force Plotly to respect insertion order (Jan→Dec) instead
+    # of sorting month abbreviation strings alphabetically.
+    fig_month.update_xaxes(
+        categoryorder="array",
+        categoryarray=monthly["month_name"].tolist()
+    )
     fig_month.update_layout(
         height=300, xaxis_title="Month", yaxis_title="Avg trips/hour",
         margin=dict(t=10, b=40), showlegend=False
     )
     st.plotly_chart(fig_month, use_container_width=True)
 
-    peak_m   = monthly.nlargest(1, "trip_count").iloc[0]
+    peak_m   = monthly.nlargest(1,  "trip_count").iloc[0]
     trough_m = monthly.nsmallest(1, "trip_count").iloc[0]
     swing    = (peak_m.trip_count / trough_m.trip_count - 1) * 100
     st.markdown(
@@ -448,13 +506,12 @@ elif tab_choice == "Location Hotspots":
 
     zone_df = demand_series[demand_series["pu_location_id"] == selected_zone_id].copy()
     zone_df["dow_name"] = pd.to_datetime(zone_df["trip_date"]).dt.strftime("%a")
-    dow_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
     heatmap_data = (
         zone_df.groupby(["pickup_hour", "dow_name"])["trip_count"]
         .mean().reset_index()
         .pivot(index="pickup_hour", columns="dow_name", values="trip_count")
-        .reindex(columns=dow_order)
+        .reindex(columns=DOW_ORDER)   # FIX: use the canonical DOW_ORDER constant
     )
 
     fig_heat = go.Figure(go.Heatmap(
@@ -526,6 +583,9 @@ elif tab_choice == "Capacity Planning":
         demand_series[demand_series["pu_location_id"] == selected_zone_id]
         .sort_values("datetime").copy()
     )
+    # Tag real rows so the autoregressive buffer can distinguish them from
+    # appended predicted rows when computing rolling averages (Bug 4 fix).
+    zone_df["_is_real"] = True
 
     # ── C1: KPIs ────────────────────────────────────────────────
     st.subheader("Zone performance summary")
@@ -554,10 +614,12 @@ elif tab_choice == "Capacity Planning":
         .sort_values(["year", "month_num"])
     )
 
-    year_colors = {2023: "#90CAF9", 2024: "#2196F3", 2025: "#0D47A1"}
-    fig_yoy = go.Figure()
+    # FIX (Bug 2): derive year colors dynamically from whatever years are in data
+    year_colors = dynamic_year_colors(yoy["year"].unique())
 
+    fig_yoy = go.Figure()
     for yr, grp in yoy.groupby("year"):
+        grp = grp.sort_values("month_num")   # FIX (Bug 1): sort by month number
         fig_yoy.add_trace(go.Scatter(
             x=grp["month_name"], y=grp["trip_count"].round(1),
             mode="lines+markers", name=str(yr),
@@ -565,6 +627,11 @@ elif tab_choice == "Capacity Planning":
             hovertemplate=f"{yr} %{{x}}: %{{y:.0f}} trips/hr<extra></extra>"
         ))
 
+    # FIX (Bug 1): force x-axis to use calendar month order, not alphabetical
+    fig_yoy.update_xaxes(
+        categoryorder="array",
+        categoryarray=MONTH_ORDER
+    )
     fig_yoy.update_layout(
         height=320, hovermode="x unified",
         xaxis_title="Month", yaxis_title="Avg trips/hour",
@@ -584,7 +651,7 @@ elif tab_choice == "Capacity Planning":
         unsafe_allow_html=True
     )
 
-    seed_df   = zone_df.tail(500).copy()
+    seed_df    = zone_df.tail(500).copy()
     proj_start = DATA_THROUGH + pd.Timedelta(hours=1)
     proj_dts   = [proj_start + pd.Timedelta(hours=h) for h in range(90 * 24)]
 
@@ -667,6 +734,12 @@ elif tab_choice == "Capacity Planning":
         marker_color="#EF5350",
         hovertemplate="%{x}: %{y} drivers<extra>Peak</extra>"
     ))
+    # FIX (Bug 1): month_label here is "Jan YYYY" strings — preserve
+    # chronological order by explicitly listing them in projection order.
+    fig_drv.update_xaxes(
+        categoryorder="array",
+        categoryarray=monthly_proj["month_label"].tolist()
+    )
     fig_drv.update_layout(
         height=300, barmode="group",
         xaxis_title="Month", yaxis_title="Concurrent drivers needed",
